@@ -420,7 +420,8 @@ bot.action('top_rated_movies', async (ctx) => {
   try {
     await ctx.editMessageText(`⭐ Fetching top-rated movies...`);
     
-    const content = await tmdbScraper.getTopRatedMovies();
+    const result = await tmdbScraper.getTopRatedMovies();
+    const content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -467,12 +468,25 @@ bot.action('top_rated_movies', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 1;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Movies';
+    let message = `💡 Use /unsubscribe to change your genre preference!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons after all recommendations
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More Movies', callback_data: 'load_more_movies' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_movies' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -590,7 +604,8 @@ bot.action('top_rated_series', async (ctx) => {
   try {
     await ctx.editMessageText(`⭐ Fetching top-rated TV series...`);
     
-    const content = await tmdbScraper.getTopRatedTVSeries();
+    const result = await tmdbScraper.getTopRatedTVSeries();
+    const content = result.series || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -637,12 +652,25 @@ bot.action('top_rated_series', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 1;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More TV Series';
+    let message = `💡 Use /unsubscribe to change your genre preference!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated TV series! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons after all recommendations
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More TV Series', callback_data: 'load_more_series' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_series' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -761,7 +789,8 @@ bot.action('load_more_movies', async (ctx) => {
     await ctx.answerCbQuery('Loading more top-rated movies...');
     
     // Get the next page of movies (page 2)
-    const content = await tmdbScraper.getTopRatedMovies(2);
+    const result = await tmdbScraper.getTopRatedMovies(2);
+    const content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more top-rated movies available at the moment.');
@@ -799,12 +828,25 @@ bot.action('load_more_movies', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Movies';
+    let message = `💡 Want even more movies?`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons
-    await ctx.reply(`💡 Want even more movies?`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More Movies', callback_data: 'load_more_movies_3' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_movies_3' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -822,7 +864,8 @@ bot.action('load_more_series', async (ctx) => {
     await ctx.answerCbQuery('Loading more top-rated TV series...');
     
     // Get the next page of TV series (page 2)
-    const content = await tmdbScraper.getTopRatedTVSeries(2);
+    const result = await tmdbScraper.getTopRatedTVSeries(2);
+    const content = result.series || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more top-rated TV series available at the moment.');
@@ -860,12 +903,25 @@ bot.action('load_more_series', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More TV Series';
+    let message = `💡 Want even more TV series?`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated TV series! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons
-    await ctx.reply(`💡 Want even more TV series?`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More TV Series', callback_data: 'load_more_series_3' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_series_3' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -883,7 +939,8 @@ bot.action('load_more_movies_3', async (ctx) => {
     await ctx.answerCbQuery('Loading even more top-rated movies...');
     
     // Get page 3 of movies
-    const content = await tmdbScraper.getTopRatedMovies(3);
+    const result = await tmdbScraper.getTopRatedMovies(3);
+    const content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more top-rated movies available at the moment.');
@@ -921,11 +978,27 @@ bot.action('load_more_movies_3', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of great movies!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 3;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Movies';
+    let message = `💡 That's a lot of great movies!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_movies_4' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -941,7 +1014,8 @@ bot.action('load_more_series_3', async (ctx) => {
     await ctx.answerCbQuery('Loading even more top-rated TV series...');
     
     // Get page 3 of TV series
-    const content = await tmdbScraper.getTopRatedTVSeries(3);
+    const result = await tmdbScraper.getTopRatedTVSeries(3);
+    const content = result.series || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more top-rated TV series available at the moment.');
@@ -979,11 +1053,27 @@ bot.action('load_more_series_3', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of great TV series!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 3;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More TV Series';
+    let message = `💡 That's a lot of great TV series!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of top-rated TV series! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_series_4' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -1004,16 +1094,21 @@ bot.action('load_more_trending', async (ctx) => {
     
     let content = [];
     
+    let result;
+    
     if (user && user.contentType && user.genre) {
       // Personalized trending content
       if (user.contentType === 'series') {
-        content = await tmdbScraper.getTVSeriesByGenreName(user.genre, 2);
+        result = await tmdbScraper.getTVSeriesByGenreName(user.genre, 2);
+        content = result.series || result;
       } else {
-        content = await tmdbScraper.getMoviesByGenreName(user.genre, 2);
+        result = await tmdbScraper.getMoviesByGenreName(user.genre, 2);
+        content = result.movies || result;
       }
     } else {
       // General trending content
-      content = await tmdbScraper.getTrendingMovies(2);
+      result = await tmdbScraper.getTrendingMovies(2);
+      content = result.movies || result;
     }
     
     if (content.length === 0) {
@@ -1052,11 +1147,27 @@ bot.action('load_more_trending', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of trending content!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Trending';
+    let message = `💡 That's a lot of trending content!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of trending content! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_trending_3' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -1083,12 +1194,15 @@ bot.action('load_more_releases', async (ctx) => {
     const contentType = user.contentType;
     const genreName = user.genre;
     
+    let result;
     let content = [];
     
     if (contentType === 'series') {
-      content = await tmdbScraper.getTVSeriesByGenreName(genreName, 2);
+      result = await tmdbScraper.getTVSeriesByGenreName(genreName, 2);
+      content = result.series || result;
     } else {
-      content = await tmdbScraper.getMoviesByGenreName(genreName, 2);
+      result = await tmdbScraper.getMoviesByGenreName(genreName, 2);
+      content = result.movies || result;
     }
     
     if (content.length === 0) {
@@ -1127,11 +1241,27 @@ bot.action('load_more_releases', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of great releases!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Releases';
+    let message = `💡 That's a lot of great releases!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of ${genreName} ${contentType} releases! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_releases_3' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -1146,7 +1276,8 @@ bot.action('load_more_now_playing', async (ctx) => {
   try {
     await ctx.answerCbQuery('Loading more now playing movies...');
     
-    const content = await tmdbScraper.getNowPlayingMovies(2);
+    const result = await tmdbScraper.getNowPlayingMovies(2);
+    const content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more now playing movies available at the moment.');
@@ -1184,11 +1315,27 @@ bot.action('load_more_now_playing', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of great movies in theaters!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Now Playing';
+    let message = `💡 That's a lot of great movies in theaters!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of now playing movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_now_playing_3' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -1203,7 +1350,8 @@ bot.action('load_more_now_airing', async (ctx) => {
   try {
     await ctx.answerCbQuery('Loading more now airing TV series...');
     
-    const content = await tmdbScraper.getNowAiringTVSeries(2);
+    const result = await tmdbScraper.getNowAiringTVSeries(2);
+    const content = result.series || result;
     
     if (content.length === 0) {
       await ctx.reply('❌ No more now airing TV series available at the moment.');
@@ -1241,11 +1389,27 @@ bot.action('load_more_now_airing', async (ctx) => {
       }
     }
     
-    // Add back to main menu button
-    await ctx.reply(`💡 That's a lot of great TV series airing!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 2;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Now Airing';
+    let message = `💡 That's a lot of great TV series airing!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of now airing TV series! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: buttonText, callback_data: hasMore ? 'load_more_now_airing_3' : 'no_more_content' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
