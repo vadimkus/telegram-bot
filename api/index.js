@@ -188,7 +188,7 @@ bot.action('content_series', async (ctx) => {
 
 bot.action('trending_now', async (ctx) => {
   try {
-    await ctx.answerCbQuery('Loading trending content...');
+    await ctx.answerCbQuery('🔥 Loading trending content...', { show_alert: false });
     
     // Get user's subscription to show personalized trending content
     const user = await prisma.user.findUnique({
@@ -360,7 +360,7 @@ bot.action('trending_now', async (ctx) => {
 
 bot.action('today_releases', async (ctx) => {
   try {
-    await ctx.answerCbQuery('Loading today\'s releases...');
+    await ctx.answerCbQuery('📅 Loading today\'s releases...', { show_alert: false });
     
     // Get user's subscription if they have one
     const user = await prisma.user.findUnique({
@@ -443,6 +443,7 @@ Or use /trending to see what's popular right now.`;
 // Handle top rated movies button
 bot.action('top_rated_movies', async (ctx) => {
   try {
+    await ctx.answerCbQuery('⭐ Loading top-rated movies...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top-rated movies...`);
     
     const result = await tmdbScraper.getTopRatedMovies();
@@ -535,6 +536,7 @@ bot.action('top_rated_movies', async (ctx) => {
 // Handle now playing movies button
 bot.action('now_playing_movies', async (ctx) => {
   try {
+    await ctx.answerCbQuery('🎬 Loading now playing movies...', { show_alert: false });
     await ctx.editMessageText(`🎬 Fetching now playing movies...`);
     
     const result = await tmdbScraper.getNowPlayingMovies();
@@ -627,6 +629,7 @@ bot.action('now_playing_movies', async (ctx) => {
 // Handle top rated TV series button
 bot.action('top_rated_series', async (ctx) => {
   try {
+    await ctx.answerCbQuery('⭐ Loading top-rated TV series...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top-rated TV series...`);
     
     const result = await tmdbScraper.getTopRatedTVSeries();
@@ -719,6 +722,7 @@ bot.action('top_rated_series', async (ctx) => {
 // Handle now airing TV series button
 bot.action('now_airing_series', async (ctx) => {
   try {
+    await ctx.answerCbQuery('📺 Loading now airing TV series...', { show_alert: false });
     await ctx.editMessageText(`📺 Fetching now airing TV series...`);
     
     const result = await tmdbScraper.getNowAiringTVSeries();
