@@ -126,6 +126,9 @@ bot.action('content_movies', async (ctx) => {
         { text: '🤠 Western', callback_data: 'genre_western' }
       ],
       [
+        { text: '⭐ Top Rated Movies', callback_data: 'top_rated_movies' }
+      ],
+      [
         { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
       ]
     ]
@@ -168,6 +171,9 @@ bot.action('content_series', async (ctx) => {
         { text: '🎭 Thriller', callback_data: 'series_genre_thriller' },
         { text: '⚔️ War', callback_data: 'series_genre_war' },
         { text: '🤠 Western', callback_data: 'series_genre_western' }
+      ],
+      [
+        { text: '⭐ Top Rated TV Series', callback_data: 'top_rated_series' }
       ],
       [
         { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
@@ -308,7 +314,13 @@ bot.action('trending_now', async (ctx) => {
       }
     }
     
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`);
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
     
   } catch (error) {
     console.error('Error fetching trending content:', error);
@@ -381,11 +393,268 @@ Or use /trending to see what's popular right now.`;
       }
     }
     
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`);
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
     
   } catch (error) {
     console.error('Error fetching today\'s releases:', error);
     ctx.reply('❌ Sorry, there was an error fetching today\'s releases. Please try again later.');
+  }
+});
+
+// Handle top rated movies button
+bot.action('top_rated_movies', async (ctx) => {
+  try {
+    await ctx.editMessageText(`⭐ Fetching top-rated movies...`);
+    
+    const content = await tmdbScraper.getTopRatedMovies();
+    
+    if (content.length === 0) {
+      await ctx.editMessageText(
+        `⭐ **Top Rated Movies**\n\nSorry, no top-rated movies found. Please try again later.`,
+        { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+
+    await ctx.editMessageText(`⭐ **Top Rated Movies**\n\nHere are the highest-rated movies:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button after all recommendations
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching top-rated movies:', error);
+    await ctx.editMessageText(
+      'Sorry, there was an error fetching top-rated movies. Please try again later.',
+      { 
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          ]
+        }
+      }
+    );
+  }
+});
+
+// Handle top rated TV series button
+bot.action('top_rated_series', async (ctx) => {
+  try {
+    await ctx.editMessageText(`⭐ Fetching top-rated TV series...`);
+    
+    const content = await tmdbScraper.getTopRatedTVSeries();
+    
+    if (content.length === 0) {
+      await ctx.editMessageText(
+        `⭐ **Top Rated TV Series**\n\nSorry, no top-rated TV series found. Please try again later.`,
+        { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+
+    await ctx.editMessageText(`⭐ **Top Rated TV Series**\n\nHere are the highest-rated TV series:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button after all recommendations
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching top-rated TV series:', error);
+    await ctx.editMessageText(
+      'Sorry, there was an error fetching top-rated TV series. Please try again later.',
+      { 
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          ]
+        }
+      }
+    );
+  }
+});
+
+// Handle top rated button (legacy - keeping for backward compatibility)
+bot.action('top_rated', async (ctx) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+
+    let contentType = 'movie'; // Default to movies
+    let genreName = '';
+    
+    if (user && user.contentType) {
+      contentType = user.contentType;
+      genreName = user.genre || '';
+    }
+    
+    await ctx.editMessageText(`⭐ Fetching top-rated ${contentType}${genreName ? ` in ${genreName}` : ''}...`);
+    
+    let content = [];
+    
+    if (contentType === 'series') {
+      if (genreName && genreName !== '') {
+        content = await tmdbScraper.getTVSeriesByGenreName(genreName);
+      } else {
+        content = await tmdbScraper.getTopRatedTVSeries();
+      }
+    } else {
+      if (genreName && genreName !== '') {
+        content = await tmdbScraper.getMoviesByGenreName(genreName);
+      } else {
+        content = await tmdbScraper.getTopRatedMovies();
+      }
+    }
+    
+    if (content.length === 0) {
+      await ctx.editMessageText(
+        `⭐ **Top Rated ${contentType}${genreName ? ` in ${genreName}` : ''}**\n\nSorry, no top-rated content found. Please try again later.`,
+        { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+
+    await ctx.editMessageText(`⭐ **Top Rated ${contentType}${genreName ? ` in ${genreName}` : ''}**\n\nHere are the highest-rated ${contentType}:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button after all recommendations
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching top-rated content:', error);
+    await ctx.editMessageText(
+      'Sorry, there was an error fetching top-rated content. Please try again later.',
+      { 
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          ]
+        }
+      }
+    );
   }
 });
 
@@ -812,7 +1081,13 @@ This will help me send you personalized movie recommendations! 🍿`;
       }
     }
     
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`);
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
     
   } catch (error) {
     console.error('Error fetching today\'s movies:', error);
@@ -861,7 +1136,13 @@ bot.command('trending', async (ctx) => {
       }
     }
     
-    await ctx.reply(`💡 Use /today for new releases or /subscribe <genre> for personalized updates!`);
+    await ctx.reply(`💡 Use /today for new releases or /subscribe <genre> for personalized updates!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
     
   } catch (error) {
     console.error('Error fetching trending movies:', error);
