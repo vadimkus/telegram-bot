@@ -498,7 +498,8 @@ bot.action('now_playing_movies', async (ctx) => {
   try {
     await ctx.editMessageText(`🎬 Fetching now playing movies...`);
     
-    const content = await tmdbScraper.getNowPlayingMovies();
+    const result = await tmdbScraper.getNowPlayingMovies();
+    const content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -545,12 +546,25 @@ bot.action('now_playing_movies', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 1;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Now Playing';
+    let message = `💡 Use /unsubscribe to change your genre preference!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of now playing movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons after all recommendations
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More Now Playing', callback_data: 'load_more_now_playing' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_now_playing' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -654,7 +668,8 @@ bot.action('now_airing_series', async (ctx) => {
   try {
     await ctx.editMessageText(`📺 Fetching now airing TV series...`);
     
-    const content = await tmdbScraper.getNowAiringTVSeries();
+    const result = await tmdbScraper.getNowAiringTVSeries();
+    const content = result.series || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -701,12 +716,25 @@ bot.action('now_airing_series', async (ctx) => {
       }
     }
     
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 1;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Now Airing';
+    let message = `💡 Use /unsubscribe to change your genre preference!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of now airing TV series! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
     // Add load more and back to main menu buttons after all recommendations
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More Now Airing', callback_data: 'load_more_now_airing' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_now_airing' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -1225,6 +1253,18 @@ bot.action('load_more_now_airing', async (ctx) => {
     console.error('Error loading more now airing TV series:', error);
     await ctx.reply('❌ Sorry, there was an error loading more now airing TV series. Please try again later.');
   }
+});
+
+// Handle no more content button
+bot.action('no_more_content', async (ctx) => {
+  await ctx.answerCbQuery('🏁 You\'ve reached the end of recommendations!');
+  await ctx.reply('🏁 **End of Content**\n\nYou\'ve reached the end of available recommendations. Try exploring other categories or genres!', {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+      ]
+    }
+  });
 });
 
 // Handle top rated button (legacy - keeping for backward compatibility)
