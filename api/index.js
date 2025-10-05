@@ -126,7 +126,8 @@ bot.action('content_movies', async (ctx) => {
         { text: '🤠 Western', callback_data: 'genre_western' }
       ],
       [
-        { text: '⭐ Top Rated Movies', callback_data: 'top_rated_movies' }
+        { text: '⭐ Top Rated Movies', callback_data: 'top_rated_movies' },
+        { text: '🎬 Now Playing', callback_data: 'now_playing_movies' }
       ],
       [
         { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
@@ -173,7 +174,8 @@ bot.action('content_series', async (ctx) => {
         { text: '🤠 Western', callback_data: 'series_genre_western' }
       ],
       [
-        { text: '⭐ Top Rated TV Series', callback_data: 'top_rated_series' }
+        { text: '⭐ Top Rated TV Series', callback_data: 'top_rated_series' },
+        { text: '📺 Now Airing', callback_data: 'now_airing_series' }
       ],
       [
         { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
@@ -317,7 +319,10 @@ bot.action('trending_now', async (ctx) => {
     await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: '📈 Load More Trending', callback_data: 'load_more_trending' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -396,7 +401,10 @@ Or use /trending to see what's popular right now.`;
     await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: '📈 Load More Releases', callback_data: 'load_more_releases' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -459,11 +467,14 @@ bot.action('top_rated_movies', async (ctx) => {
       }
     }
     
-    // Add back to main menu button after all recommendations
+    // Add load more and back to main menu buttons after all recommendations
     await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: '📈 Load More Movies', callback_data: 'load_more_movies' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -471,6 +482,84 @@ bot.action('top_rated_movies', async (ctx) => {
     console.error('Error fetching top-rated movies:', error);
     await ctx.editMessageText(
       'Sorry, there was an error fetching top-rated movies. Please try again later.',
+      { 
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          ]
+        }
+      }
+    );
+  }
+});
+
+// Handle now playing movies button
+bot.action('now_playing_movies', async (ctx) => {
+  try {
+    await ctx.editMessageText(`🎬 Fetching now playing movies...`);
+    
+    const content = await tmdbScraper.getNowPlayingMovies();
+    
+    if (content.length === 0) {
+      await ctx.editMessageText(
+        `🎬 **Now Playing Movies**\n\nSorry, no now playing movies found. Please try again later.`,
+        { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+
+    await ctx.editMessageText(`🎬 **Now Playing Movies**\n\nHere are the movies currently playing in theaters:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add load more and back to main menu buttons after all recommendations
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📈 Load More Now Playing', callback_data: 'load_more_now_playing' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching now playing movies:', error);
+    await ctx.editMessageText(
+      'Sorry, there was an error fetching now playing movies. Please try again later.',
       { 
         reply_markup: {
           inline_keyboard: [
@@ -534,11 +623,14 @@ bot.action('top_rated_series', async (ctx) => {
       }
     }
     
-    // Add back to main menu button after all recommendations
+    // Add load more and back to main menu buttons after all recommendations
     await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          [
+            { text: '📈 Load More TV Series', callback_data: 'load_more_series' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
         ]
       }
     });
@@ -554,6 +646,584 @@ bot.action('top_rated_series', async (ctx) => {
         }
       }
     );
+  }
+});
+
+// Handle now airing TV series button
+bot.action('now_airing_series', async (ctx) => {
+  try {
+    await ctx.editMessageText(`📺 Fetching now airing TV series...`);
+    
+    const content = await tmdbScraper.getNowAiringTVSeries();
+    
+    if (content.length === 0) {
+      await ctx.editMessageText(
+        `📺 **Now Airing TV Series**\n\nSorry, no now airing TV series found. Please try again later.`,
+        { 
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+            ]
+          }
+        }
+      );
+      return;
+    }
+
+    await ctx.editMessageText(`📺 **Now Airing TV Series**\n\nHere are the TV series currently airing:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add load more and back to main menu buttons after all recommendations
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📈 Load More Now Airing', callback_data: 'load_more_now_airing' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching now airing TV series:', error);
+    await ctx.editMessageText(
+      'Sorry, there was an error fetching now airing TV series. Please try again later.',
+      { 
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+          ]
+        }
+      }
+    );
+  }
+});
+
+// Handle load more movies button
+bot.action('load_more_movies', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more top-rated movies...');
+    
+    // Get the next page of movies (page 2)
+    const content = await tmdbScraper.getTopRatedMovies(2);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more top-rated movies available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`⭐ **More Top Rated Movies**\n\nHere are additional highest-rated movies:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(`💡 Want even more movies?`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📈 Load More Movies', callback_data: 'load_more_movies_3' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more movies:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more movies. Please try again later.');
+  }
+});
+
+// Handle load more TV series button
+bot.action('load_more_series', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more top-rated TV series...');
+    
+    // Get the next page of TV series (page 2)
+    const content = await tmdbScraper.getTopRatedTVSeries(2);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more top-rated TV series available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`⭐ **More Top Rated TV Series**\n\nHere are additional highest-rated TV series:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(`💡 Want even more TV series?`, {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📈 Load More TV Series', callback_data: 'load_more_series_3' },
+            { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+          ]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more TV series:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more TV series. Please try again later.');
+  }
+});
+
+// Handle load more movies button (page 3)
+bot.action('load_more_movies_3', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading even more top-rated movies...');
+    
+    // Get page 3 of movies
+    const content = await tmdbScraper.getTopRatedMovies(3);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more top-rated movies available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`⭐ **Even More Top Rated Movies**\n\nHere are additional highest-rated movies:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of great movies!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more movies:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more movies. Please try again later.');
+  }
+});
+
+// Handle load more TV series button (page 3)
+bot.action('load_more_series_3', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading even more top-rated TV series...');
+    
+    // Get page 3 of TV series
+    const content = await tmdbScraper.getTopRatedTVSeries(3);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more top-rated TV series available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`⭐ **Even More Top Rated TV Series**\n\nHere are additional highest-rated TV series:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of great TV series!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more TV series:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more TV series. Please try again later.');
+  }
+});
+
+// Handle load more trending button
+bot.action('load_more_trending', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more trending content...');
+    
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    
+    let content = [];
+    
+    if (user && user.contentType && user.genre) {
+      // Personalized trending content
+      if (user.contentType === 'series') {
+        content = await tmdbScraper.getTVSeriesByGenreName(user.genre, 2);
+      } else {
+        content = await tmdbScraper.getMoviesByGenreName(user.genre, 2);
+      }
+    } else {
+      // General trending content
+      content = await tmdbScraper.getTrendingMovies(2);
+    }
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more trending content available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`🔥 **More Trending Content**\n\nHere are additional trending items:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of trending content!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more trending content:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more trending content. Please try again later.');
+  }
+});
+
+// Handle load more releases button
+bot.action('load_more_releases', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more releases...');
+    
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+
+    if (!user || !user.genre || !user.contentType) {
+      await ctx.reply('❌ Please set your preferences first to get personalized releases.');
+      return;
+    }
+
+    const contentType = user.contentType;
+    const genreName = user.genre;
+    
+    let content = [];
+    
+    if (contentType === 'series') {
+      content = await tmdbScraper.getTVSeriesByGenreName(genreName, 2);
+    } else {
+      content = await tmdbScraper.getMoviesByGenreName(genreName, 2);
+    }
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more releases available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`📅 **More ${genreName} ${contentType} Releases**\n\nHere are additional releases:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of great releases!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more releases:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more releases. Please try again later.');
+  }
+});
+
+// Handle load more now playing button
+bot.action('load_more_now_playing', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more now playing movies...');
+    
+    const content = await tmdbScraper.getNowPlayingMovies(2);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more now playing movies available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`🎬 **More Now Playing Movies**\n\nHere are additional movies currently in theaters:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of great movies in theaters!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more now playing movies:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more now playing movies. Please try again later.');
+  }
+});
+
+// Handle load more now airing button
+bot.action('load_more_now_airing', async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Loading more now airing TV series...');
+    
+    const content = await tmdbScraper.getNowAiringTVSeries(2);
+    
+    if (content.length === 0) {
+      await ctx.reply('❌ No more now airing TV series available at the moment.');
+      return;
+    }
+
+    await ctx.reply(`📺 **More Now Airing TV Series**\n\nHere are additional TV series currently airing:`);
+
+    for (let i = 0; i < content.length; i++) {
+      const item = content[i];
+      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const rating = item.rating && item.rating !== 'N/A' ? `⭐ ${item.rating}/10` : '⭐ Rating: N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
+      
+      const keyboard = [];
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
+      }
+      
+      const replyOptions = {
+        caption: itemMessage,
+        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+      };
+      
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
+        try {
+          await ctx.replyWithPhoto(item.poster, replyOptions);
+        } catch (error) {
+          // If image fails, send text only
+          await ctx.reply(itemMessage);
+        }
+      } else {
+        await ctx.reply(itemMessage);
+      }
+    }
+    
+    // Add back to main menu button
+    await ctx.reply(`💡 That's a lot of great TV series airing!`, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }]
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Error loading more now airing TV series:', error);
+    await ctx.reply('❌ Sorry, there was an error loading more now airing TV series. Please try again later.');
   }
 });
 
