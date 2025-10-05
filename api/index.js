@@ -2059,23 +2059,28 @@ async function fetchNewReleases(type = 'movie', genreName = '') {
     if (type === 'series') {
       if (genreName && genreName !== '') {
         // Get TV series by specific genre
-        content = await tmdbScraper.getTVSeriesByGenreName(genreName);
+        const result = await tmdbScraper.getTVSeriesByGenreName(genreName);
+        content = result.series || result;
       } else {
         // Get popular TV series for general recommendations
-        content = await tmdbScraper.getPopularTVSeries();
+        const result = await tmdbScraper.getPopularTVSeries();
+        content = result.series || result;
       }
     } else {
       if (genreName && genreName !== '') {
         // Get movies by specific genre
-        content = await tmdbScraper.getMoviesByGenreName(genreName);
+        const result = await tmdbScraper.getMoviesByGenreName(genreName);
+        content = result.movies || result;
       } else {
         // Get popular movies for general recommendations
-        content = await tmdbScraper.getPopularMovies();
+        const result = await tmdbScraper.getPopularMovies();
+        content = result.movies || result;
       }
       
       // If no movies found, try new releases
       if (content.length === 0) {
-        content = await tmdbScraper.getNewReleases();
+        const newReleases = await tmdbScraper.getNewReleases();
+        content = newReleases;
       }
     }
     
