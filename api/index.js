@@ -343,29 +343,57 @@ bot.action('show_help', async (ctx) => {
 });
 
 bot.action('back_to_main', async (ctx) => {
-  const welcomeMessage = `🎬 Welcome to Daily Movie & TV Series Bot! 🎬
+  try {
+    const welcomeMessage = `🎬 Welcome to Daily Movie & TV Series Bot! 🎬
 
 I'll send you daily recommendations for movies and TV shows based on your favorite genres!
 
 What would you like to explore?`;
 
-  const mainKeyboard = {
-    inline_keyboard: [
-      [
-        { text: '🎬 Movies', callback_data: 'content_movies' },
-        { text: '📺 TV Series', callback_data: 'content_series' }
-      ],
-      [
-        { text: '🔥 Trending Now', callback_data: 'trending_now' },
-        { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
-      ],
-      [
-        { text: '❓ Help & Commands', callback_data: 'show_help' }
+    const mainKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🎬 Movies', callback_data: 'content_movies' },
+          { text: '📺 TV Series', callback_data: 'content_series' }
+        ],
+        [
+          { text: '🔥 Trending Now', callback_data: 'trending_now' },
+          { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
+        ],
+        [
+          { text: '❓ Help & Commands', callback_data: 'show_help' }
+        ]
       ]
-    ]
-  };
-  
-  await ctx.editMessageText(welcomeMessage, { reply_markup: mainKeyboard });
+    };
+    
+    await ctx.editMessageText(welcomeMessage, { reply_markup: mainKeyboard });
+  } catch (error) {
+    // If edit fails, send a new message instead
+    console.log('Edit failed, sending new message instead');
+    const welcomeMessage = `🎬 Welcome to Daily Movie & TV Series Bot! 🎬
+
+I'll send you daily recommendations for movies and TV shows based on your favorite genres!
+
+What would you like to explore?`;
+
+    const mainKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🎬 Movies', callback_data: 'content_movies' },
+          { text: '📺 TV Series', callback_data: 'content_series' }
+        ],
+        [
+          { text: '🔥 Trending Now', callback_data: 'trending_now' },
+          { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
+        ],
+        [
+          { text: '❓ Help & Commands', callback_data: 'show_help' }
+        ]
+      ]
+    };
+    
+    await ctx.reply(welcomeMessage, { reply_markup: mainKeyboard });
+  }
 });
 
 // Handle genre selection callback
