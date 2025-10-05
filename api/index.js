@@ -16,7 +16,8 @@ const CHANNEL_ID = process.env.CHANNEL_ID; // e.g., '@your_channel'
 const tmdbScraper = new TMDBScraper(TMDB_API_KEY);
 
 // Available genres mapping
-const GENRES = {
+// Movie genres from TMDB API
+const MOVIE_GENRES = {
   'action': 28,
   'adventure': 12,
   'animation': 16,
@@ -36,6 +37,29 @@ const GENRES = {
   'war': 10752,
   'western': 37
 };
+
+// TV series genres from TMDB API
+const TV_GENRES = {
+  'action & adventure': 10759,
+  'animation': 16,
+  'comedy': 35,
+  'crime': 80,
+  'documentary': 99,
+  'drama': 18,
+  'family': 10751,
+  'kids': 10762,
+  'mystery': 9648,
+  'news': 10763,
+  'reality': 10764,
+  'sci-fi & fantasy': 10765,
+  'soap': 10766,
+  'talk': 10767,
+  'war & politics': 10768,
+  'western': 37
+};
+
+// Combined genres for display (using movie genres as base)
+const GENRES = MOVIE_GENRES;
 
 // Command: /start - Welcome and content type selection
 bot.start(async (ctx) => {
@@ -158,49 +182,137 @@ bot.action('trending_now', async (ctx) => {
   try {
     await ctx.answerCbQuery('Loading trending content...');
     
-    const trendingMovies = await tmdbScraper.getTrendingMovies();
+    // Get user's subscription to show personalized trending content
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
     
-    if (trendingMovies.length === 0) {
-      return ctx.reply('❌ Sorry, couldn\'t fetch trending movies right now. Please try again later.');
+    if (!user) {
+      // If no user preference, show general trending
+      const trendingMovies = await tmdbScraper.getTrendingMovies();
+      
+      if (trendingMovies.length === 0) {
+        return ctx.reply('❌ Sorry, couldn\'t fetch trending movies right now. Please try again later.');
+      }
+      
+      await ctx.reply(`🔥 Trending Movies Right Now`);
+      
+      // Send each trending movie with its poster
+      for (let i = 0; i < trendingMovies.length; i++) {
+        const movie = trendingMovies[i];
+        const rating = movie.rating !== 'N/A' ? `⭐ ${movie.rating}` : '⭐ No rating yet';
+        const movieMessage = `${i + 1}. **${movie.title}** (${movie.year})\n${rating}\n📝 ${movie.plot}`;
+        
+        // Create inline keyboard with video link if available
+        const keyboard = [];
+        if (movie.videoUrl) {
+          keyboard.push([{ text: '🎬 Watch Trailer', url: movie.videoUrl }]);
+        }
+        
+        const replyOptions = {
+          caption: movieMessage,
+          reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        };
+        
+        // Send movie with poster if available
+        if (movie.poster && movie.poster !== '') {
+          try {
+            await ctx.replyWithPhoto(movie.poster, replyOptions);
+          } catch (error) {
+            // If image fails, send text only
+            await ctx.reply(movieMessage);
+          }
+        } else {
+          await ctx.reply(movieMessage);
+        }
+      }
+      
+      await ctx.reply(`💡 Use /start to set your preferences for personalized trending content!`);
+      return;
     }
     
-    await ctx.reply(`🔥 Trending Movies Right Now`);
+    // Show personalized trending content based on user's genre and content type
+    let trendingContent = [];
+    let contentType = user.contentType || 'movie';
+    let genreName = user.genre;
     
-    // Send each trending movie with its poster
-    for (let i = 0; i < trendingMovies.length; i++) {
-      const movie = trendingMovies[i];
-      const rating = movie.rating !== 'N/A' ? `⭐ ${movie.rating}` : '⭐ No rating yet';
-      const movieMessage = `${i + 1}. **${movie.title}** (${movie.year})\n${rating}\n📝 ${movie.plot}`;
+    if (contentType === 'series') {
+      // Get trending TV series for the user's genre
+      if (genreName && GENRES[genreName.toLowerCase()]) {
+        const genreId = GENRES[genreName.toLowerCase()];
+        const genreSeries = await tmdbScraper.getTVSeriesByGenre(genreId);
+        trendingContent = genreSeries.slice(0, 3).map(series => ({
+          title: series.title,
+          year: series.first_air_date ? series.first_air_date.split('-')[0] : new Date().getFullYear().toString(),
+          rating: series.vote_average ? series.vote_average.toString() : 'N/A',
+          plot: series.overview || 'No description available',
+          poster: series.poster_path,
+          source: `TMDB Trending ${genreName} TV`
+        }));
+      } else {
+        trendingContent = await tmdbScraper.getTrendingTVSeries();
+      }
+    } else {
+      // Get trending movies for the user's genre
+      if (genreName && GENRES[genreName.toLowerCase()]) {
+        const genreId = GENRES[genreName.toLowerCase()];
+        const genreMovies = await tmdbScraper.getMoviesByGenre(genreId);
+        trendingContent = genreMovies.slice(0, 3).map(movie => ({
+          title: movie.title,
+          year: movie.release_date ? movie.release_date.split('-')[0] : new Date().getFullYear().toString(),
+          rating: movie.vote_average ? movie.vote_average.toString() : 'N/A',
+          plot: movie.overview || 'No description available',
+          poster: movie.poster_path,
+          source: `TMDB Trending ${genreName} Movies`
+        }));
+      } else {
+        trendingContent = await tmdbScraper.getTrendingMovies();
+      }
+    }
+    
+    if (trendingContent.length === 0) {
+      return ctx.reply(`❌ Sorry, couldn't find trending ${contentType} in your preferred genre right now. Please try again later.`);
+    }
+    
+    const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
+    const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
+    await ctx.reply(`🔥 Trending${genreText} ${contentTypeText} Right Now`);
+    
+    // Send each trending item with its poster
+    for (let i = 0; i < trendingContent.length; i++) {
+      const item = trendingContent[i];
+      const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
+      const itemMessage = `${i + 1}. **${item.title}** (${item.year})\n${rating}\n📝 ${item.plot}`;
       
       // Create inline keyboard with video link if available
       const keyboard = [];
-      if (movie.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: movie.videoUrl }]);
+      if (item.videoUrl) {
+        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
       }
       
       const replyOptions = {
-        caption: movieMessage,
+        caption: itemMessage,
         reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
       };
       
-      // Send movie with poster if available
-      if (movie.poster && movie.poster !== '') {
+      // Send item with poster if available
+      if (item.poster && item.poster !== '') {
         try {
-          await ctx.replyWithPhoto(movie.poster, replyOptions);
+          await ctx.replyWithPhoto(item.poster, replyOptions);
         } catch (error) {
           // If image fails, send text only
-          await ctx.reply(movieMessage);
+          await ctx.reply(itemMessage);
         }
       } else {
-        await ctx.reply(movieMessage);
+        await ctx.reply(itemMessage);
       }
     }
     
-    await ctx.reply(`💡 Use /today for new releases or /subscribe <genre> for personalized updates!`);
+    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`);
     
   } catch (error) {
-    console.error('Error fetching trending movies:', error);
-    ctx.reply('❌ Sorry, there was an error fetching trending movies. Please try again later.');
+    console.error('Error fetching trending content:', error);
+    ctx.reply('❌ Sorry, there was an error fetching trending content. Please try again later.');
   }
 });
 
@@ -222,21 +334,27 @@ Or use /trending to see what's popular right now.`;
       return await ctx.reply(setupMessage);
     }
     
-    let message = `🎬 Today's Movie Recommendations\n\n`;
+    // Show personalized recommendations based on user's genre and content type
+    const contentType = user.contentType || 'movie';
+    const genreName = user.genre;
     
-    // Show personalized recommendations based on user's genre
-    const releases = await fetchNewReleases('movie', user.genre);
+    let releases = await fetchNewReleases(contentType, genreName);
     
     if (releases.length === 0) {
-      message += `📅 No new ${user.genre} movies released today.\n\n`;
+      const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
+      const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
+      await ctx.reply(`📅 No new${genreText} ${contentTypeText.toLowerCase()} released today.`);
     } else {
-      message += `🎭 Your Genre: ${user.genre.charAt(0).toUpperCase() + user.genre.slice(1)}\n\n`;
+      const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
+      const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
+      await ctx.reply(`📅 Today's${genreText} ${contentTypeText} Releases`);
       
-      // Send each movie with its poster
+      // Send each item with its poster
       for (let i = 0; i < releases.length; i++) {
         const item = releases[i];
         const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
+        const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
+        const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
         
         // Create inline keyboard with video link if available
         const keyboard = [];
@@ -245,57 +363,20 @@ Or use /trending to see what's popular right now.`;
         }
         
         const replyOptions = {
-          caption: movieMessage,
+          caption: itemMessage,
           reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
         };
         
-        // Send movie with poster if available
+        // Send item with poster if available
         if (item.poster_path && item.poster_path !== '') {
           try {
             await ctx.replyWithPhoto(item.poster_path, replyOptions);
           } catch (error) {
             // If image fails, send text only
-            await ctx.reply(movieMessage);
+            await ctx.reply(itemMessage);
           }
         } else {
-          await ctx.reply(movieMessage);
-        }
-      }
-    }
-    
-    // Show general releases as well
-    const generalReleases = await fetchNewReleases('movie');
-    
-    if (generalReleases.length > 0) {
-      await ctx.reply(`🌍 General Releases Today:`);
-      
-      // Send each general movie with its poster
-      for (let i = 0; i < Math.min(3, generalReleases.length); i++) {
-        const item = generalReleases[i];
-        const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 100)}...`;
-        
-        // Create inline keyboard with video link if available
-        const keyboard = [];
-        if (item.videoUrl) {
-          keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-        }
-        
-        const replyOptions = {
-          caption: movieMessage,
-          reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
-        };
-        
-        // Send movie with poster if available
-        if (item.poster_path && item.poster_path !== '') {
-          try {
-            await ctx.replyWithPhoto(item.poster_path, replyOptions);
-          } catch (error) {
-            // If image fails, send text only
-            await ctx.reply(movieMessage);
-          }
-        } else {
-          await ctx.reply(movieMessage);
+          await ctx.reply(itemMessage);
         }
       }
     }
@@ -303,8 +384,8 @@ Or use /trending to see what's popular right now.`;
     await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`);
     
   } catch (error) {
-    console.error('Error fetching today\'s movies:', error);
-    ctx.reply('❌ Sorry, there was an error fetching today\'s movies. Please try again later.');
+    console.error('Error fetching today\'s releases:', error);
+    ctx.reply('❌ Sorry, there was an error fetching today\'s releases. Please try again later.');
   }
 });
 
@@ -439,7 +520,12 @@ You're all set! Use /today to get your first movie recommendations! 🍿`;
 
 // Handle TV series genre selection callback
 bot.action(/^series_genre_(.+)$/, async (ctx) => {
-  const genre = ctx.match[1];
+  let genre = ctx.match[1];
+  
+  // Handle special cases for genre mapping
+  if (genre === 'sci-fi') {
+    genre = 'science fiction';
+  }
   
   try {
     // Save user's TV series genre preference
@@ -660,7 +746,8 @@ This will help me send you personalized movie recommendations! 🍿`;
       for (let i = 0; i < releases.length; i++) {
         const item = releases[i];
         const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
+        const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
+        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
         
         // Create inline keyboard with video link if available
         const keyboard = [];
@@ -697,7 +784,8 @@ This will help me send you personalized movie recommendations! 🍿`;
       for (let i = 0; i < Math.min(3, generalReleases.length); i++) {
         const item = generalReleases[i];
         const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 100)}...`;
+        const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
+        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 100)}...`;
         
         // Create inline keyboard with video link if available
         const keyboard = [];
@@ -847,7 +935,8 @@ cron.schedule('0 0 * * *', async () => {
       for (let i = 0; i < releases.length; i++) {
         const item = releases[i];
         const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
+        const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
+        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
         
         // Send movie with poster if available
         if (item.poster_path && item.poster_path !== '') {
@@ -876,7 +965,8 @@ cron.schedule('0 0 * * *', async () => {
         for (let i = 0; i < generalReleases.length; i++) {
           const item = generalReleases[i];
           const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-          const movieMessage = `${i + 1}. **${item.title}** (${item.release_date})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
+          const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
+        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
           
           // Send movie with poster if available
           if (item.poster_path && item.poster_path !== '') {
