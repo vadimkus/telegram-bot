@@ -3,7 +3,7 @@
 // Requires .env with BOT_TOKEN, TMDB_API_KEY, CHANNEL_ID (for posting), DATABASE_URL (Prisma)
 
 require('dotenv').config();
-const Telegraf = require('telegraf');
+const { Telegraf } = require('telegraf');
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const cron = require('node-cron');
