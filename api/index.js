@@ -195,9 +195,10 @@ bot.action('trending_now', async (ctx) => {
       where: { telegramId: ctx.from.id.toString() }
     });
     
-    if (!user) {
+    if (!user || !user.genre || !user.contentType) {
       // If no user preference, show general trending
-      const trendingMovies = await tmdbScraper.getTrendingMovies();
+      const result = await tmdbScraper.getTrendingMovies();
+      const trendingMovies = result.movies || result;
       
       if (trendingMovies.length === 0) {
         return ctx.reply('❌ Sorry, couldn\'t fetch trending movies right now. Please try again later.');
@@ -235,46 +236,56 @@ bot.action('trending_now', async (ctx) => {
         }
       }
       
-      await ctx.reply(`💡 Use /start to set your preferences for personalized trending content!`);
+      // Check if there are more pages available
+      const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+      const currentPage = result.currentPage || 1;
+      const totalPages = result.totalPages || 1;
+      
+      let buttonText = '📈 Load More Trending';
+      let message = `💡 Use /start to set your preferences for personalized trending content!`;
+      
+      if (!hasMore) {
+        buttonText = '🔚 No More Content';
+        message = `🏁 **End of Recommendations**\n\nYou've reached the end of trending movies! (Page ${currentPage} of ${totalPages})\n\n💡 Use /start to set your preferences for personalized trending content!`;
+      }
+      
+      // Add load more and back to main menu buttons
+      await ctx.reply(message, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: buttonText, callback_data: hasMore ? 'load_more_trending' : 'no_more_content' },
+              { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
+            ]
+          ]
+        }
+      });
       return;
     }
     
     // Show personalized trending content based on user's genre and content type
+    let result;
     let trendingContent = [];
     let contentType = user.contentType || 'movie';
     let genreName = user.genre;
     
     if (contentType === 'series') {
       // Get trending TV series for the user's genre
-      if (genreName && GENRES[genreName.toLowerCase()]) {
-        const genreId = GENRES[genreName.toLowerCase()];
-        const genreSeries = await tmdbScraper.getTVSeriesByGenre(genreId);
-        trendingContent = genreSeries.slice(0, 3).map(series => ({
-          title: series.title,
-          year: series.first_air_date ? series.first_air_date.split('-')[0] : new Date().getFullYear().toString(),
-          rating: series.vote_average ? series.vote_average.toString() : 'N/A',
-          plot: series.overview || 'No description available',
-          poster: series.poster_path,
-          source: `TMDB Trending ${genreName} TV`
-        }));
+      if (genreName && TV_GENRES[genreName.toLowerCase()]) {
+        result = await tmdbScraper.getTVSeriesByGenreName(genreName);
+        trendingContent = result.series || result;
       } else {
-        trendingContent = await tmdbScraper.getTrendingTVSeries();
+        result = await tmdbScraper.getTrendingTVSeries();
+        trendingContent = result.series || result;
       }
     } else {
       // Get trending movies for the user's genre
-      if (genreName && GENRES[genreName.toLowerCase()]) {
-        const genreId = GENRES[genreName.toLowerCase()];
-        const genreMovies = await tmdbScraper.getMoviesByGenre(genreId);
-        trendingContent = genreMovies.slice(0, 3).map(movie => ({
-          title: movie.title,
-          year: movie.release_date ? movie.release_date.split('-')[0] : new Date().getFullYear().toString(),
-          rating: movie.vote_average ? movie.vote_average.toString() : 'N/A',
-          plot: movie.overview || 'No description available',
-          poster: movie.poster_path,
-          source: `TMDB Trending ${genreName} Movies`
-        }));
+      if (genreName && MOVIE_GENRES[genreName.toLowerCase()]) {
+        result = await tmdbScraper.getMoviesByGenreName(genreName);
+        trendingContent = result.movies || result;
       } else {
-        trendingContent = await tmdbScraper.getTrendingMovies();
+        result = await tmdbScraper.getTrendingMovies();
+        trendingContent = result.movies || result;
       }
     }
     
@@ -316,11 +327,25 @@ bot.action('trending_now', async (ctx) => {
       }
     }
     
-    await ctx.reply(`💡 Use /unsubscribe to change your genre preference!`, {
+    // Check if there are more pages available
+    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
+    const currentPage = result.currentPage || 1;
+    const totalPages = result.totalPages || 1;
+    
+    let buttonText = '📈 Load More Trending';
+    let message = `💡 Use /unsubscribe to change your genre preference!`;
+    
+    if (!hasMore) {
+      buttonText = '🔚 No More Content';
+      message = `🏁 **End of Recommendations**\n\nYou've reached the end of trending ${contentType}! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
+    }
+    
+    // Add load more and back to main menu buttons
+    await ctx.reply(message, {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📈 Load More Trending', callback_data: 'load_more_trending' },
+            { text: buttonText, callback_data: hasMore ? 'load_more_trending' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
