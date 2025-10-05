@@ -23,7 +23,9 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^6.16.3",
+    "axios": "^1.12.2",
     "dotenv": "^17.2.3",
+    "node-cron": "^4.2.1",
     "prisma": "^6.16.3",
     "telegraf": "^4.16.3"
   },

@@ -1,6 +1,4 @@
-// Telegram Bot Database Schema
-// This schema defines the data models for the Telegram bot
-
+// prisma/schema.prisma - DB Schema for User Preferences
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,94 +8,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model to store Telegram user information
 model User {
-  id        String   @id @default(cuid())
-  telegramId BigInt  @unique // Telegram user ID
-  username  String?
-  firstName String?
-  lastName  String?
-  languageCode String?
-  isBot     Boolean  @default(false)
-  isPremium Boolean  @default(false)
-  
-  // Bot-specific fields
-  isBlocked Boolean  @default(false)
-  isActive  Boolean  @default(true)
-  lastSeen  DateTime @default(now())
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relations
-  messages  Message[]
-  sessions  Session[]
-  
-  @@map("users")
-}
-
-// Message model to store bot interactions
-model Message {
-  id        String   @id @default(cuid())
-  messageId BigInt   // Telegram message ID
-  text      String?
-  messageType String  @default("text") // text, photo, document, etc.
-  
-  // Relations
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionId String?
-  session   Session? @relation(fields: [sessionId], references: [id])
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  
-  @@map("messages")
-}
-
-// Session model to track user sessions
-model Session {
-  id        String   @id @default(cuid())
-  isActive  Boolean  @default(true)
-  startedAt DateTime @default(now())
-  endedAt   DateTime?
-  
-  // Relations
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  Message[]
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("sessions")
-}
-
-// Bot settings and configuration
-model BotSettings {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  value       String
-  description String?
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@map("bot_settings")
-}
-
-// Analytics and statistics
-model Analytics {
-  id        String   @id @default(cuid())
-  event     String   // user_started, message_sent, command_used, etc.
-  data      Json?    // Additional event data
-  userId    String?
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  
-  @@map("analytics")
+  id         Int      @id @default(autoincrement())
+  telegramId String   @unique
+  genre      String?
 }

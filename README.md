@@ -1,18 +1,16 @@
-# Telegram Bot with Telegraf
+# Daily Movie & TV Show Update Bot
 
-A simple Telegram bot built with [Telegraf](https://telegraf.js.org/) framework.
+A Telegram bot that sends daily movie and TV show updates based on user genre preferences. Built with [Telegraf](https://telegraf.js.org/) and deployed on Vercel.
 
 ## Features
 
-- 🤖 Basic command handling
-- 👋 Welcome messages
-- ℹ️ User information display
-- 🔄 Message echoing
-- 📝 Help system
-- 🗄️ **Database integration with PostgreSQL**
-- 📊 **Analytics and user tracking**
-- 📈 **Bot statistics**
-- 🔐 **User session management**
+- 🎬 **Daily Movie Updates** - Personalized movie recommendations
+- 🎭 **Genre-based Subscriptions** - Users can subscribe to specific genres
+- 📺 **TMDB Integration** - Real-time movie data from The Movie Database
+- 📱 **Telegram Channel Support** - Post updates to channels
+- ⏰ **Automated Scheduling** - Daily updates via Vercel Cron Jobs
+- 🗄️ **Database Integration** - User preferences stored in PostgreSQL
+- 🚀 **Serverless Deployment** - Runs on Vercel with webhook support
 
 ## Setup
 
@@ -61,22 +59,22 @@ npm start
 
 ## Available Commands
 
-- `/start` - Start the bot
-- `/help` - Show help message
-- `/hello` - Say hello
-- `/info` - Get user information
-- `/stats` - Get bot statistics
-- `/echo <text>` - Echo your message
+- `/start` - Welcome message and instructions
+- `/subscribe <genre>` - Subscribe to daily updates for a specific genre
+  - Example: `/subscribe action` or `/subscribe comedy`
+
+## Supported Genres
+
+- action, adventure, animation, comedy, crime, documentary, drama, family, fantasy, horror, mystery, romance, science fiction, thriller, war, western
 
 ## Database Schema
 
-The bot uses PostgreSQL with the following main models:
+The bot uses PostgreSQL with a simple User model:
 
-- **User** - Stores Telegram user information
-- **Message** - Tracks all bot interactions
-- **Session** - Manages user sessions
-- **Analytics** - Event tracking and statistics
-- **BotSettings** - Bot configuration storage
+- **User** - Stores user Telegram ID and preferred genre
+  - `id` - Auto-incrementing primary key
+  - `telegramId` - Unique Telegram user ID
+  - `genre` - User's preferred movie genre (optional)
 
 ## Development
 

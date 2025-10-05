@@ -1,185 +1,69 @@
-const { Telegraf } = require('telegraf');
+// index.js - Daily Movie and TV Show Update Bot for Telegram
+// Deploy on Vercel as serverless function with webhook
+// Requires .env with BOT_TOKEN, TMDB_API_KEY, CHANNEL_ID (for posting), DATABASE_URL (Prisma)
+
 require('dotenv').config();
-const db = require('./lib/database');
+const Telegraf = require('telegraf');
+const { PrismaClient } = require('@prisma/client');
+const axios = require('axios');
+const cron = require('node-cron');
 
-// Initialize bot with token from environment variables
 const bot = new Telegraf(process.env.BOT_TOKEN);
+const prisma = new PrismaClient();
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const CHANNEL_ID = process.env.CHANNEL_ID; // e.g., '@your_channel'
 
-// Start command
-bot.start(async (ctx) => {
-  try {
-    // Create or update user in database
-    const user = await db.createOrUpdateUser(ctx.from);
-    
-    // Track analytics
-    await db.trackEvent('user_started', { command: '/start' }, user.id);
-    
-    // Create new session
-    const session = await db.createSession(user.id);
-    
-    ctx.reply(`Hello ${ctx.from.first_name}! Welcome to the bot! 🤖\n\nUse /help to see available commands.`);
-  } catch (error) {
-    console.error('Error in start command:', error);
-    ctx.reply('Hello! Welcome to the bot! 🤖\n\nUse /help to see available commands.');
-  }
+// Command: /start - Welcome and subscribe
+bot.start((ctx) => {
+  ctx.reply('Welcome to Daily Movie & TV Bot! Use /subscribe <genre> to get daily updates (e.g., /subscribe action). Genres: action, drama, comedy, etc.');
 });
 
-// Help command
-bot.help(async (ctx) => {
-  try {
-    // Track analytics
-    await db.trackEvent('command_used', { command: '/help' });
-    
-    const helpText = `
-🤖 *Bot Commands:*
-
-/start - Start the bot
-/help - Show this help message
-/hello - Say hello
-/info - Get bot information
-/stats - Get bot statistics (admin)
-/echo <text> - Echo your message
-
-*Features:*
-• Simple command handling
-• Message echoing
-• User information display
-• Database integration
-• Analytics tracking
-  `;
-    ctx.reply(helpText, { parse_mode: 'Markdown' });
-  } catch (error) {
-    console.error('Error in help command:', error);
-    ctx.reply('Help command is temporarily unavailable.');
-  }
-});
-
-// Hello command
-bot.command('hello', async (ctx) => {
-  try {
-    await db.trackEvent('command_used', { command: '/hello' });
-    ctx.reply(`Hello ${ctx.from.first_name}! 👋`);
-  } catch (error) {
-    console.error('Error in hello command:', error);
-    ctx.reply(`Hello ${ctx.from.first_name}! 👋`);
-  }
-});
-
-// Info command
-bot.command('info', async (ctx) => {
-  try {
-    await db.trackEvent('command_used', { command: '/info' });
-    
-    const userInfo = `
-👤 *User Information:*
-• Name: ${ctx.from.first_name} ${ctx.from.last_name || ''}
-• Username: @${ctx.from.username || 'Not set'}
-• ID: ${ctx.from.id}
-• Language: ${ctx.from.language_code || 'Not set'}
-• Premium: ${ctx.from.is_premium ? 'Yes' : 'No'}
-  `;
-    ctx.reply(userInfo, { parse_mode: 'Markdown' });
-  } catch (error) {
-    console.error('Error in info command:', error);
-    ctx.reply('Info command is temporarily unavailable.');
-  }
-});
-
-// Stats command (admin)
-bot.command('stats', async (ctx) => {
-  try {
-    await db.trackEvent('command_used', { command: '/stats' });
-    
-    const stats = await db.getStats();
-    const statsText = `
-📊 *Bot Statistics:*
-• Total Users: ${stats.totalUsers}
-• Active Users: ${stats.activeUsers}
-• Total Messages: ${stats.totalMessages}
-• Total Sessions: ${stats.totalSessions}
-• New Users (24h): ${stats.recentUsers}
-  `;
-    ctx.reply(statsText, { parse_mode: 'Markdown' });
-  } catch (error) {
-    console.error('Error in stats command:', error);
-    ctx.reply('Stats command is temporarily unavailable.');
-  }
-});
-
-// Echo command
-bot.command('echo', async (ctx) => {
-  try {
-    await db.trackEvent('command_used', { command: '/echo' });
-    
-    const text = ctx.message.text.split(' ').slice(1).join(' ');
-    if (text) {
-      ctx.reply(`Echo: ${text}`);
-    } else {
-      ctx.reply('Please provide text to echo. Usage: /echo <text>');
-    }
-  } catch (error) {
-    console.error('Error in echo command:', error);
-    ctx.reply('Echo command is temporarily unavailable.');
-  }
-});
-
-// Handle any text message
-bot.on('text', async (ctx) => {
-  try {
-    // Get or create user
-    const user = await db.createOrUpdateUser(ctx.from);
-    
-    // Get active session
-    let session = await db.getActiveSession(user.id);
-    if (!session) {
-      session = await db.createSession(user.id);
-    }
-    
-    // Save message to database
-    await db.createMessage({
-      messageId: ctx.message.message_id,
-      text: ctx.message.text,
-      messageType: 'text',
-      userId: user.id,
-      sessionId: session.id,
-    });
-    
-    // Track analytics
-    await db.trackEvent('message_sent', { 
-      messageType: 'text',
-      textLength: ctx.message.text.length 
-    }, user.id);
-    
-    ctx.reply(`You said: "${ctx.message.text}"`);
-  } catch (error) {
-    console.error('Error handling text message:', error);
-    ctx.reply(`You said: "${ctx.message.text}"`);
-  }
-});
-
-// Error handling
-bot.catch((err, ctx) => {
-  console.error('Bot error:', err);
-  ctx.reply('Sorry, something went wrong! 😅');
-});
-
-// Start the bot
-if (process.env.BOT_TOKEN) {
-  bot.launch();
-  console.log('🤖 Bot is running with database integration!');
-  
-  // Enable graceful stop
-  process.once('SIGINT', async () => {
-    console.log('🛑 Shutting down bot...');
-    await db.cleanup();
-    bot.stop('SIGINT');
+// Command: /subscribe genre - Save user preference
+bot.command('subscribe', async (ctx) => {
+  const genre = ctx.message.text.split(' ')[1].toLowerCase();
+  if (!genre) return ctx.reply('Please specify a genre, e.g., /subscribe action');
+  await prisma.user.upsert({
+    where: { telegramId: ctx.from.id.toString() },
+    update: { genre },
+    create: { telegramId: ctx.from.id.toString(), genre }
   });
-  process.once('SIGTERM', async () => {
-    console.log('🛑 Shutting down bot...');
-    await db.cleanup();
-    bot.stop('SIGTERM');
-  });
-} else {
-  console.error('❌ BOT_TOKEN not found in environment variables');
-  console.log('Please create a .env file with your bot token');
+  ctx.reply(`Subscribed to ${genre}! You'll get daily updates.`);
+});
+
+// Fetch new movies/TV from TMDb API
+async function fetchNewReleases(type = 'movie', genre = '') {
+  const url = `https://api.themoviedb.org/3/discover/${type}?api_key=${TMDB_API_KEY}&sort_by=release_date.desc&release_date.gte=${new Date().toISOString().split('T')[0]}&with_genres=${genre}&page=1`;
+  const response = await axios.get(url);
+  return response.data.results.slice(0, 5); // Top 5 new releases
 }
+
+// Daily cron job to post to channel (runs at midnight)
+cron.schedule('0 0 * * *', async () => {
+  const users = await prisma.user.findMany();
+  for (const user of users) {
+    const releases = await fetchNewReleases('movie', user.genre);
+    let message = `Daily ${user.genre.charAt(0).toUpperCase() + user.genre.slice(1)} Movie Updates:\n`;
+    releases.forEach((item) => {
+      message += `${item.title} (${item.release_date}) - Rating: ${item.vote_average}\nOverview: ${item.overview.slice(0, 100)}...\n\n`;
+    });
+    await bot.telegram.sendMessage(user.telegramId, message);
+  }
+  // Post to channel (general, no genre)
+  const generalReleases = await fetchNewReleases('movie');
+  let channelMessage = 'Daily Movie Updates:\n';
+  generalReleases.forEach((item) => {
+    channelMessage += `${item.title} (${item.release_date}) - Rating: ${item.vote_average}\nOverview: ${item.overview.slice(0, 100)}...\n\n`;
+  });
+  await bot.telegram.sendMessage(CHANNEL_ID, channelMessage);
+});
+
+// Webhook setup for Vercel (export as handler)
+module.exports = (req, res) => {
+  if (req.method === 'POST') {
+    bot.handleUpdate(req.body, res);
+  } else {
+    res.status(200).send('OK');
+  }
+};
+
+// Local testing: bot.launch();
