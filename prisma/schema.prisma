@@ -9,7 +9,8 @@ datasource db {
 }
 
 model User {
-  id         Int      @id @default(autoincrement())
-  telegramId String   @unique
-  genre      String?
+  id           Int      @id @default(autoincrement())
+  telegramId   String   @unique
+  genre        String?
+  contentType  String?  @default("movie") // "movie" or "series"
 }
