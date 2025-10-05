@@ -9,6 +9,10 @@ A simple Telegram bot built with [Telegraf](https://telegraf.js.org/) framework.
 - ℹ️ User information display
 - 🔄 Message echoing
 - 📝 Help system
+- 🗄️ **Database integration with PostgreSQL**
+- 📊 **Analytics and user tracking**
+- 📈 **Bot statistics**
+- 🔐 **User session management**
 
 ## Setup
 
@@ -28,6 +32,7 @@ A simple Telegram bot built with [Telegraf](https://telegraf.js.org/) framework.
 2. Edit `.env` and add your bot token:
    ```
    BOT_TOKEN=your_actual_bot_token_here
+   DATABASE_URL=your_postgresql_connection_string
    ```
 
 ### 3. Install Dependencies
@@ -36,7 +41,19 @@ A simple Telegram bot built with [Telegraf](https://telegraf.js.org/) framework.
 npm install
 ```
 
-### 4. Run the Bot
+### 4. Setup Database
+
+1. Generate Prisma client:
+   ```bash
+   npm run db:generate
+   ```
+
+2. Push database schema:
+   ```bash
+   npm run db:push
+   ```
+
+### 5. Run the Bot
 
 ```bash
 npm start
@@ -48,7 +65,18 @@ npm start
 - `/help` - Show help message
 - `/hello` - Say hello
 - `/info` - Get user information
+- `/stats` - Get bot statistics
 - `/echo <text>` - Echo your message
+
+## Database Schema
+
+The bot uses PostgreSQL with the following main models:
+
+- **User** - Stores Telegram user information
+- **Message** - Tracks all bot interactions
+- **Session** - Manages user sessions
+- **Analytics** - Event tracking and statistics
+- **BotSettings** - Bot configuration storage
 
 ## Development
 
@@ -56,13 +84,21 @@ npm start
 
 - `npm start` - Start the bot
 - `npm run dev` - Start with nodemon (if installed)
+- `npm run db:generate` - Generate Prisma client
+- `npm run db:push` - Push schema to database
+- `npm run db:migrate` - Run database migrations
+- `npm run db:studio` - Open Prisma Studio
 
 ### Project Structure
 
 ```
 telegram-bot/
 ├── index.js          # Main bot file
-├── package.json     # Dependencies and scripts
+├── lib/
+│   └── database.js   # Database service
+├── prisma/
+│   └── schema.prisma # Database schema
+├── package.json      # Dependencies and scripts
 ├── env.example       # Environment template
 └── README.md         # This file
 ```
