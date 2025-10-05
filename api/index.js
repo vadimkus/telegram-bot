@@ -6,7 +6,7 @@ require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
-const cron = require('node-cron');
+// const cron = require('node-cron'); // Not needed for Vercel deployment
 const TMDBScraper = require('../lib/tmdb-scraper');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -2104,84 +2104,34 @@ async function fetchNewReleases(type = 'movie', genreName = '') {
   }
 }
 
-// Daily cron job to post to channel (runs at midnight)
-cron.schedule('0 0 * * *', async () => {
-  try {
-    const users = await prisma.user.findMany();
-    
-    for (const user of users) {
-      const releases = await fetchNewReleases('movie', user.genre);
-      
-      if (releases.length === 0) {
-        await bot.telegram.sendMessage(user.telegramId, 
-          `🎬 Daily ${user.genre.charAt(0).toUpperCase() + user.genre.slice(1)} Movie Updates\n\nNo new releases today, but check back tomorrow! 🍿`);
-        continue;
-      }
-      
-      await bot.telegram.sendMessage(user.telegramId, `🎬 Daily ${user.genre.charAt(0).toUpperCase() + user.genre.slice(1)} Movie Updates`);
-      
-      // Send each movie with its poster
-      for (let i = 0; i < releases.length; i++) {
-        const item = releases[i];
-        const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-        const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
-        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
-        
-        // Send movie with poster if available
-        if (item.poster_path && item.poster_path !== '') {
-          try {
-            await bot.telegram.sendPhoto(user.telegramId, item.poster_path, { caption: movieMessage });
-          } catch (error) {
-            // If image fails, send text only
-            await bot.telegram.sendMessage(user.telegramId, movieMessage);
-          }
-        } else {
-          await bot.telegram.sendMessage(user.telegramId, movieMessage);
-        }
-      }
-      
-      await bot.telegram.sendMessage(user.telegramId, `💡 Use /unsubscribe to stop these updates`);
-    }
-    
-    // Post to channel (general, no genre) if CHANNEL_ID is set
-    if (CHANNEL_ID) {
-      const generalReleases = await fetchNewReleases('movie');
-      
-      if (generalReleases.length > 0) {
-        await bot.telegram.sendMessage(CHANNEL_ID, `🎬 Daily Movie Updates`);
-        
-        // Send each movie with its poster
-        for (let i = 0; i < generalReleases.length; i++) {
-          const item = generalReleases[i];
-          const rating = item.vote_average ? `⭐ ${item.vote_average}/10` : '⭐ No rating yet';
-          const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
-        const movieMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
-          
-          // Send movie with poster if available
-          if (item.poster_path && item.poster_path !== '') {
-            try {
-              await bot.telegram.sendPhoto(CHANNEL_ID, item.poster_path, { caption: movieMessage });
-            } catch (error) {
-              // If image fails, send text only
-              await bot.telegram.sendMessage(CHANNEL_ID, movieMessage);
-            }
-          } else {
-            await bot.telegram.sendMessage(CHANNEL_ID, movieMessage);
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error in daily cron job:', error);
-  }
-});
+// Note: Cron job is handled separately in /api/cron.js for Vercel deployment
 
 // Webhook setup for Vercel (export as handler)
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   if (req.method === 'POST') {
-    bot.handleUpdate(req.body, res);
+    try {
+      await bot.handleUpdate(req.body);
+      res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error('Webhook error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  } else if (req.method === 'GET' && req.query.setWebhook) {
+    // Set webhook URL for Telegram
+    try {
+      const webhookUrl = `${req.headers.host}/api/index`;
+      await bot.telegram.setWebhook(webhookUrl);
+      res.status(200).json({ 
+        ok: true, 
+        message: `Webhook set to: ${webhookUrl}`,
+        webhookUrl: webhookUrl
+      });
+    } catch (error) {
+      console.error('Webhook setup error:', error);
+      res.status(500).json({ error: 'Failed to set webhook' });
+    }
   } else {
-    res.status(200).send('OK');
+    res.status(200).json({ ok: true });
   }
 };
 
