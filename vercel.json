@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/simple-bot.js",
+      "src": "api/basic.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/simple-bot.js"
+      "dest": "/api/basic.js"
     }
   ]
 }
