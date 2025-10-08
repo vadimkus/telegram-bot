@@ -74,13 +74,14 @@ What would you like to explore?`;
     inline_keyboard: [
       [
         { text: '🚀 START', callback_data: 'content_movies' },
-        { text: '📺 TV Series', callback_data: 'content_series' }
+        { text: '🎬 Movies', callback_data: 'content_movies' }
       ],
       [
-        { text: '🔥 Trending Now', callback_data: 'trending_now' },
-        { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
+        { text: '📺 TV Series', callback_data: 'content_series' },
+        { text: '🔥 Trending Now', callback_data: 'trending_now' }
       ],
       [
+        { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
         { text: '❓ Help & Commands', callback_data: 'show_help' }
       ]
     ]
@@ -100,13 +101,15 @@ Click the START button below to begin exploring movies and TV shows!`;
     const startKeyboard = {
       inline_keyboard: [
         [
-          { text: '🚀 START', callback_data: 'content_movies' }
+          { text: '🚀 START', callback_data: 'content_movies' },
+          { text: '🎬 Movies', callback_data: 'content_movies' }
         ],
         [
           { text: '📺 TV Series', callback_data: 'content_series' },
           { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
+          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -290,39 +293,27 @@ bot.action('trending_now', async (ctx) => {
       return;
     }
     
-    // Show personalized trending content based on user's genre and content type
+    // Show trending content from TMDB
     let result;
     let trendingContent = [];
     let contentType = user.contentType || 'movie';
-    let genreName = user.genre;
     
     if (contentType === 'series') {
-      // Get trending TV series for the user's genre
-      if (genreName && TV_GENRES[genreName.toLowerCase()]) {
-        result = await tmdbScraper.getTVSeriesByGenreName(genreName);
-        trendingContent = result.series || result;
-      } else {
-        result = await tmdbScraper.getTrendingTVSeries();
-        trendingContent = result.series || result;
-      }
+      // Get trending TV series
+      result = await tmdbScraper.getTrendingTVSeries();
+      trendingContent = result.series || result;
     } else {
-      // Get trending movies for the user's genre
-      if (genreName && MOVIE_GENRES[genreName.toLowerCase()]) {
-        result = await tmdbScraper.getMoviesByGenreName(genreName);
-        trendingContent = result.movies || result;
-      } else {
-        result = await tmdbScraper.getTrendingMovies();
-        trendingContent = result.movies || result;
-      }
+      // Get trending movies
+      result = await tmdbScraper.getTrendingMovies();
+      trendingContent = result.movies || result;
     }
     
     if (trendingContent.length === 0) {
-      return ctx.reply(`❌ Sorry, couldn't find trending ${contentType} in your preferred genre right now. Please try again later.`);
+      return ctx.reply(`❌ Sorry, couldn't find trending ${contentType} right now. Please try again later.`);
     }
     
-    const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
     const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
-    await ctx.reply(`🔥 Trending${genreText} ${contentTypeText} Right Now`);
+    await ctx.reply(`🔥 Trending ${contentTypeText} Right Now`);
     
     // Send each trending item with its poster
     for (let i = 0; i < trendingContent.length; i++) {
@@ -403,20 +394,17 @@ Or use /trending to see what's popular right now.`;
       return await ctx.reply(setupMessage);
     }
     
-    // Show personalized recommendations based on user's genre and content type
+    // Show new releases from TMDB
     const contentType = user.contentType || 'movie';
-    const genreName = user.genre;
     
-    let releases = await fetchNewReleases(contentType, genreName);
+    let releases = await fetchNewReleases(contentType);
     
     if (releases.length === 0) {
-      const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
       const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
-      await ctx.reply(`📅 No new${genreText} ${contentTypeText.toLowerCase()} released today.`);
+      await ctx.reply(`📅 No new ${contentTypeText.toLowerCase()} released today.`);
     } else {
-      const genreText = genreName ? ` ${genreName.charAt(0).toUpperCase() + genreName.slice(1)}` : '';
       const contentTypeText = contentType === 'series' ? 'TV Series' : 'Movies';
-      await ctx.reply(`📅 Today's${genreText} ${contentTypeText} Releases`);
+      await ctx.reply(`📅 Today's ${contentTypeText} Releases`);
       
       // Send each item with its poster
       for (let i = 0; i < releases.length; i++) {
@@ -473,8 +461,17 @@ bot.action('top_rated_movies', async (ctx) => {
     await ctx.answerCbQuery('⭐ Loading top-rated movies...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top-rated movies...`);
     
-    const result = await tmdbScraper.getTopRatedMovies();
-    const content = result.movies || result;
+    // Get user's subscription to show personalized content
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    
+    let result;
+    let content = [];
+    
+    // Get top-rated movies from TMDB
+    result = await tmdbScraper.getTopRatedMovies();
+    content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -566,8 +563,17 @@ bot.action('now_playing_movies', async (ctx) => {
     await ctx.answerCbQuery('🎬 Loading now playing movies...', { show_alert: false });
     await ctx.editMessageText(`🎬 Fetching now playing movies...`);
     
-    const result = await tmdbScraper.getNowPlayingMovies();
-    const content = result.movies || result;
+    // Get user's subscription to show personalized content
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    
+    let result;
+    let content = [];
+    
+    // Get now playing movies from TMDB
+    result = await tmdbScraper.getNowPlayingMovies();
+    content = result.movies || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -659,8 +665,17 @@ bot.action('top_rated_series', async (ctx) => {
     await ctx.answerCbQuery('⭐ Loading top-rated TV series...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top-rated TV series...`);
     
-    const result = await tmdbScraper.getTopRatedTVSeries();
-    const content = result.series || result;
+    // Get user's subscription to show personalized content
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    
+    let result;
+    let content = [];
+    
+    // Get top-rated TV series from TMDB
+    result = await tmdbScraper.getTopRatedTVSeries();
+    content = result.series || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -752,8 +767,17 @@ bot.action('now_airing_series', async (ctx) => {
     await ctx.answerCbQuery('📺 Loading now airing TV series...', { show_alert: false });
     await ctx.editMessageText(`📺 Fetching now airing TV series...`);
     
-    const result = await tmdbScraper.getNowAiringTVSeries();
-    const content = result.series || result;
+    // Get user's subscription to show personalized content
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() }
+    });
+    
+    let result;
+    let content = [];
+    
+    // Get now airing TV series from TMDB
+    result = await tmdbScraper.getNowAiringTVSeries();
+    content = result.series || result;
     
     if (content.length === 0) {
       await ctx.editMessageText(
@@ -1634,13 +1658,14 @@ What would you like to explore?`;
       inline_keyboard: [
         [
           { text: '🚀 START', callback_data: 'content_movies' },
-          { text: '📺 TV Series', callback_data: 'content_series' }
+          { text: '🎬 Movies', callback_data: 'content_movies' }
         ],
         [
-          { text: '🔥 Trending Now', callback_data: 'trending_now' },
-          { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
+          { text: '📺 TV Series', callback_data: 'content_series' },
+          { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
+          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -1660,13 +1685,14 @@ What would you like to explore?`;
       inline_keyboard: [
         [
           { text: '🚀 START', callback_data: 'content_movies' },
-          { text: '📺 TV Series', callback_data: 'content_series' }
+          { text: '🎬 Movies', callback_data: 'content_movies' }
         ],
         [
-          { text: '🔥 Trending Now', callback_data: 'trending_now' },
-          { text: '📅 Today\'s Releases', callback_data: 'today_releases' }
+          { text: '📺 TV Series', callback_data: 'content_series' },
+          { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
+          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -2081,32 +2107,20 @@ bot.command('trending', async (ctx) => {
 });
 
 // Fetch new movies/TV series using TMDB API
-async function fetchNewReleases(type = 'movie', genreName = '') {
+async function fetchNewReleases(type = 'movie') {
   try {
-    console.log(`Fetching ${genreName || 'general'} ${type} using TMDB API...`);
+    console.log(`Fetching ${type} using TMDB API...`);
     
     let content = [];
     
     if (type === 'series') {
-      if (genreName && genreName !== '') {
-        // Get TV series by specific genre
-        const result = await tmdbScraper.getTVSeriesByGenreName(genreName);
-        content = result.series || result;
-      } else {
-        // Get popular TV series for general recommendations
-        const result = await tmdbScraper.getPopularTVSeries();
-        content = result.series || result;
-      }
+      // Get popular TV series
+      const result = await tmdbScraper.getPopularTVSeries();
+      content = result.series || result;
     } else {
-      if (genreName && genreName !== '') {
-        // Get movies by specific genre
-        const result = await tmdbScraper.getMoviesByGenreName(genreName);
-        content = result.movies || result;
-      } else {
-        // Get popular movies for general recommendations
-        const result = await tmdbScraper.getPopularMovies();
-        content = result.movies || result;
-      }
+      // Get popular movies
+      const result = await tmdbScraper.getPopularMovies();
+      content = result.movies || result;
       
       // If no movies found, try new releases
       if (content.length === 0) {
