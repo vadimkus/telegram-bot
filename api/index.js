@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const { PrismaClient } = require('@prisma/client');
-const tmdbScraper = require('../lib/tmdb-scraper');
+const tmdb = require('../lib/vercel-tmdb');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const prisma = new PrismaClient({
@@ -24,8 +24,8 @@ bot.start(async (ctx) => {
         username: ctx.from.username,
         languageCode: ctx.from.language_code,
         isBot: ctx.from.is_bot,
-        genre: 'action', // Default genre
-        contentType: 'movie' // Default content type
+        genre: 'action',
+        contentType: 'movie'
       },
       create: {
         telegramId: ctx.from.id.toString(),
@@ -58,7 +58,7 @@ What would you like to explore?`;
           { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
-          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
+          { text: '📅 New Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -89,7 +89,7 @@ What would you like to explore?`;
           { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
-          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
+          { text: '📅 New Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -156,7 +156,7 @@ bot.action('content_series', async (ctx) => {
     
     // Update user preference
     await prisma.user.update({
-    where: { telegramId: ctx.from.id.toString() },
+      where: { telegramId: ctx.from.id.toString() },
       data: { contentType: 'series' }
     });
     
@@ -198,24 +198,18 @@ bot.action('trending_now', async (ctx) => {
     
     if (!user) {
       const setupMessage = `🎬 Welcome! First, let's set up your preferences.
-Use /start to select your favorite genre, then come back here for personalized recommendations!
-Or use /trending to see what's popular right now.`;
+Use /start to select your favorite genre, then come back here for personalized recommendations!`;
       return await ctx.reply(setupMessage);
     }
     
     // Show trending content from TMDB
-    let result;
     let trendingContent = [];
     let contentType = user.contentType || 'movie';
     
     if (contentType === 'series') {
-      // Get trending TV series
-      result = await tmdbScraper.getTrendingTVSeries();
-      trendingContent = result.series || result;
+      trendingContent = await tmdb.getTrendingTVSeries();
     } else {
-      // Get trending movies
-      result = await tmdbScraper.getTrendingMovies();
-      trendingContent = result.movies || result;
+      trendingContent = await tmdb.getTrendingMovies();
     }
     
     if (trendingContent.length === 0) {
@@ -229,17 +223,11 @@ Or use /trending to see what's popular right now.`;
     for (let i = 0; i < trendingContent.length; i++) {
       const item = trendingContent[i];
       const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
-      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const year = item.year || 'N/A';
       const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
-      const keyboard = [];
-      if (item.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-      }
-      
       const replyOptions = {
-        caption: itemMessage,
-        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        caption: itemMessage
       };
       
       // Send item with poster if available
@@ -255,25 +243,11 @@ Or use /trending to see what's popular right now.`;
       }
     }
     
-    // Check if there are more pages available
-    const hasMore = result.hasMore !== undefined ? result.hasMore : true;
-    const currentPage = result.currentPage || 1;
-    const totalPages = result.totalPages || 1;
-    
-    let buttonText = '📈 Load More Trending';
-    let message = `💡 That's a lot of trending content!`;
-    
-    if (!hasMore) {
-      buttonText = '🔚 No More Content';
-      message = `🏁 **End of Recommendations**\n\nYou've reached the end of trending content! (Page ${currentPage} of ${totalPages})\n\n💡 Use /unsubscribe to change your genre preference!`;
-    }
-    
-    // Add load more and back to main menu buttons
-    await ctx.reply(message, {
+    // Add back to main menu button
+    await ctx.reply('💡 That\'s all the trending content!', {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: buttonText, callback_data: hasMore ? 'load_more_trending' : 'no_more_content' },
             { text: '🔙 Back to Main Menu', callback_data: 'back_to_main' }
           ]
         ]
@@ -289,8 +263,8 @@ Or use /trending to see what's popular right now.`;
 // Today's releases
 bot.action('today_releases', async (ctx) => {
   try {
-    await ctx.answerCbQuery('📅 Loading today\'s releases...', { show_alert: false });
-    await ctx.editMessageText(`📅 Fetching today's releases...`);
+    await ctx.answerCbQuery('📅 Loading new releases...', { show_alert: false });
+    await ctx.editMessageText(`📅 Fetching new releases...`);
     
     const user = await prisma.user.findUnique({
       where: { telegramId: ctx.from.id.toString() }
@@ -298,13 +272,18 @@ bot.action('today_releases', async (ctx) => {
     
     if (!user) {
       const setupMessage = `🎬 Welcome! First, let's set up your preferences.
-Use /start to select your favorite genre, then come back here for personalized recommendations!
-Or use /trending to see what's popular right now.`;
+Use /start to select your favorite genre, then come back here for personalized recommendations!`;
       return await ctx.reply(setupMessage);
     }
     
     const contentType = user.contentType || 'movie';
-    const newReleases = await fetchNewReleases(contentType);
+    let newReleases = [];
+    
+    if (contentType === 'series') {
+      newReleases = await tmdb.getPopularTVSeries();
+    } else {
+      newReleases = await tmdb.getNewReleases();
+    }
     
     if (newReleases.length === 0) {
       return ctx.reply(`❌ Sorry, couldn't find new ${contentType} releases right now. Please try again later.`);
@@ -316,18 +295,18 @@ Or use /trending to see what's popular right now.`;
     // Send each new release with its poster
     for (let i = 0; i < newReleases.length; i++) {
       const item = newReleases[i];
-      const rating = item.vote_average ? `⭐ ${item.vote_average.toFixed(1)}` : '⭐ No rating yet';
-      const year = item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString();
-      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.overview.slice(0, 120)}...`;
+      const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
+      const year = item.year || 'N/A';
+      const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
       const replyOptions = {
         caption: itemMessage
       };
       
       // Send item with poster if available
-      if (item.poster_path && item.poster_path !== '') {
+      if (item.poster && item.poster !== '') {
         try {
-          await ctx.replyWithPhoto(`https://image.tmdb.org/t/p/w500${item.poster_path}`, replyOptions);
+          await ctx.replyWithPhoto(item.poster, replyOptions);
         } catch (error) {
           // If image fails, send text only
           await ctx.reply(itemMessage);
@@ -360,8 +339,7 @@ bot.action('top_rated_movies', async (ctx) => {
     await ctx.answerCbQuery('⭐ Loading top rated movies...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top rated movies...`);
     
-    const result = await tmdbScraper.getTopRatedMovies();
-    const movies = result.movies || result;
+    const movies = await tmdb.getTopRatedMovies();
     
     if (movies.length === 0) {
       return ctx.reply('❌ Sorry, couldn\'t find top rated movies right now. Please try again later.');
@@ -373,17 +351,11 @@ bot.action('top_rated_movies', async (ctx) => {
     for (let i = 0; i < movies.length; i++) {
       const item = movies[i];
       const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
-      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const year = item.year || 'N/A';
       const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
-      const keyboard = [];
-      if (item.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-      }
-      
       const replyOptions = {
-        caption: itemMessage,
-        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        caption: itemMessage
       };
       
       // Send item with poster if available
@@ -422,8 +394,7 @@ bot.action('now_playing_movies', async (ctx) => {
     await ctx.answerCbQuery('🎬 Loading now playing movies...', { show_alert: false });
     await ctx.editMessageText(`🎬 Fetching now playing movies...`);
     
-    const result = await tmdbScraper.getNowPlayingMovies();
-    const movies = result.movies || result;
+    const movies = await tmdb.getNowPlayingMovies();
     
     if (movies.length === 0) {
       return ctx.reply('❌ Sorry, couldn\'t find now playing movies right now. Please try again later.');
@@ -435,17 +406,11 @@ bot.action('now_playing_movies', async (ctx) => {
     for (let i = 0; i < movies.length; i++) {
       const item = movies[i];
       const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
-      const year = item.year || (item.release_date ? item.release_date.split('-')[0] : new Date().getFullYear().toString());
+      const year = item.year || 'N/A';
       const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
-      const keyboard = [];
-      if (item.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-      }
-      
       const replyOptions = {
-        caption: itemMessage,
-        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        caption: itemMessage
       };
       
       // Send item with poster if available
@@ -484,8 +449,7 @@ bot.action('top_rated_series', async (ctx) => {
     await ctx.answerCbQuery('⭐ Loading top rated series...', { show_alert: false });
     await ctx.editMessageText(`⭐ Fetching top rated series...`);
     
-    const result = await tmdbScraper.getTopRatedTVSeries();
-    const series = result.series || result;
+    const series = await tmdb.getTopRatedTVSeries();
     
     if (series.length === 0) {
       return ctx.reply('❌ Sorry, couldn\'t find top rated series right now. Please try again later.');
@@ -497,17 +461,11 @@ bot.action('top_rated_series', async (ctx) => {
     for (let i = 0; i < series.length; i++) {
       const item = series[i];
       const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
-      const year = item.year || (item.first_air_date ? item.first_air_date.split('-')[0] : new Date().getFullYear().toString());
+      const year = item.year || 'N/A';
       const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
-      const keyboard = [];
-      if (item.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-      }
-      
       const replyOptions = {
-        caption: itemMessage,
-        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        caption: itemMessage
       };
       
       // Send item with poster if available
@@ -546,8 +504,7 @@ bot.action('now_airing_series', async (ctx) => {
     await ctx.answerCbQuery('📺 Loading now airing series...', { show_alert: false });
     await ctx.editMessageText(`📺 Fetching now airing series...`);
     
-    const result = await tmdbScraper.getNowAiringTVSeries();
-    const series = result.series || result;
+    const series = await tmdb.getNowAiringTVSeries();
     
     if (series.length === 0) {
       return ctx.reply('❌ Sorry, couldn\'t find now airing series right now. Please try again later.');
@@ -559,17 +516,11 @@ bot.action('now_airing_series', async (ctx) => {
     for (let i = 0; i < series.length; i++) {
       const item = series[i];
       const rating = item.rating !== 'N/A' ? `⭐ ${item.rating}` : '⭐ No rating yet';
-      const year = item.year || (item.first_air_date ? item.first_air_date.split('-')[0] : new Date().getFullYear().toString());
+      const year = item.year || 'N/A';
       const itemMessage = `${i + 1}. **${item.title}** (${year})\n${rating}\n📝 ${item.plot.slice(0, 120)}...`;
       
-      const keyboard = [];
-      if (item.videoUrl) {
-        keyboard.push([{ text: '🎬 Watch Trailer', url: item.videoUrl }]);
-      }
-      
       const replyOptions = {
-        caption: itemMessage,
-        reply_markup: keyboard.length > 0 ? { inline_keyboard: keyboard } : undefined
+        caption: itemMessage
       };
       
       // Send item with poster if available
@@ -618,7 +569,7 @@ bot.action('back_to_main', async (ctx) => {
           { text: '🔥 Trending Now', callback_data: 'trending_now' }
         ],
         [
-          { text: '📅 Today\'s Releases', callback_data: 'today_releases' },
+          { text: '📅 New Releases', callback_data: 'today_releases' },
           { text: '❓ Help & Commands', callback_data: 'show_help' }
         ]
       ]
@@ -655,7 +606,7 @@ bot.action('show_help', async (ctx) => {
 1. Use /start to begin
 2. Choose Movies or TV Series
 3. Select from trending, new releases, top rated, or now playing/airing
-4. Browse content with posters and trailers
+4. Browse content with posters and ratings
 5. Use the back button to navigate
 
 **Database Status:** ✅ Connected and working!`;
@@ -678,52 +629,13 @@ bot.action('show_help', async (ctx) => {
   }
 });
 
-// Helper function to fetch new releases
-async function fetchNewReleases(type = 'movie') {
-  try {
-    console.log(`Fetching ${type} using TMDB API...`);
-    
-    let content = [];
-    
-    if (type === 'series') {
-      // Get popular TV series
-      const result = await tmdbScraper.getPopularTVSeries();
-      content = result.series || result;
-    } else {
-      // Get popular movies
-      const result = await tmdbScraper.getPopularMovies();
-      content = result.movies || result;
-      
-      // If no movies found, try new releases
-      if (content.length === 0) {
-        const newReleases = await tmdbScraper.getNewReleases();
-        content = newReleases;
-      }
-    }
-    
-    // Format content to match expected structure
-    return content.map(item => ({
-      title: item.title,
-      release_date: item.year || item.first_air_date,
-      vote_average: item.rating === 'N/A' ? 0 : parseFloat(item.rating) || 0,
-      overview: item.plot,
-      poster_path: item.poster,
-      videoUrl: item.videoUrl
-    }));
-    
-  } catch (error) {
-    console.error(`Error fetching new ${type} releases:`, error);
-    return [];
-  }
-}
-
 // Webhook setup for Vercel (export as handler)
 module.exports = async (req, res) => {
   try {
-  if (req.method === 'POST') {
+    if (req.method === 'POST') {
       await bot.handleUpdate(req.body, res);
-  } else {
-    res.status(200).send('OK');
+    } else {
+      res.status(200).send('OK');
     }
   } catch (error) {
     console.error('Error in Vercel webhook handler:', error);
