@@ -10,7 +10,13 @@ const axios = require('axios');
 const TMDBScraper = require('../lib/tmdb-scraper');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
+});
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const CHANNEL_ID = process.env.CHANNEL_ID; // e.g., '@your_channel'
 const tmdbScraper = new TMDBScraper(TMDB_API_KEY);
