@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/working-movie-bot.js",
+      "src": "api/simple-movie-bot.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api",
-      "dest": "/api/working-movie-bot.js"
+      "dest": "/api/simple-movie-bot.js"
     }
   ]
 }
