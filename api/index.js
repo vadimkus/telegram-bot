@@ -73,7 +73,7 @@ What would you like to explore?`;
   const mainKeyboard = {
     inline_keyboard: [
       [
-        { text: '🎬 Movies', callback_data: 'content_movies' },
+        { text: '🚀 START', callback_data: 'content_movies' },
         { text: '📺 TV Series', callback_data: 'content_series' }
       ],
       [
@@ -87,6 +87,33 @@ What would you like to explore?`;
   };
   
   await ctx.reply(welcomeMessage, { reply_markup: mainKeyboard });
+});
+
+// Handle any message to show start button
+bot.on('message', async (ctx) => {
+  // If user sends any message (not a command), show start button
+  if (!ctx.message.text.startsWith('/')) {
+    const startMessage = `🎬 Welcome to Daily Movie & TV Series Bot! 🎬
+
+Click the START button below to begin exploring movies and TV shows!`;
+
+    const startKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🚀 START', callback_data: 'content_movies' }
+        ],
+        [
+          { text: '📺 TV Series', callback_data: 'content_series' },
+          { text: '🔥 Trending Now', callback_data: 'trending_now' }
+        ],
+        [
+          { text: '❓ Help & Commands', callback_data: 'show_help' }
+        ]
+      ]
+    };
+    
+    await ctx.reply(startMessage, { reply_markup: startKeyboard });
+  }
 });
 
 // Handle main menu callbacks
@@ -1606,7 +1633,7 @@ What would you like to explore?`;
     const mainKeyboard = {
       inline_keyboard: [
         [
-          { text: '🎬 Movies', callback_data: 'content_movies' },
+          { text: '🚀 START', callback_data: 'content_movies' },
           { text: '📺 TV Series', callback_data: 'content_series' }
         ],
         [
@@ -1632,7 +1659,7 @@ What would you like to explore?`;
     const mainKeyboard = {
       inline_keyboard: [
         [
-          { text: '🎬 Movies', callback_data: 'content_movies' },
+          { text: '🚀 START', callback_data: 'content_movies' },
           { text: '📺 TV Series', callback_data: 'content_series' }
         ],
         [
@@ -1787,11 +1814,11 @@ bot.command('subscribe', async (ctx) => {
   }
   
   try {
-    await prisma.user.upsert({
-      where: { telegramId: ctx.from.id.toString() },
-      update: { genre },
-      create: { telegramId: ctx.from.id.toString(), genre }
-    });
+  await prisma.user.upsert({
+    where: { telegramId: ctx.from.id.toString() },
+    update: { genre },
+    create: { telegramId: ctx.from.id.toString(), genre }
+  });
     
     ctx.reply(`✅ Successfully subscribed to ${genre.charAt(0).toUpperCase() + genre.slice(1)} movies!\n\nYou'll receive daily updates at midnight. Use /status to check your subscription.`);
   } catch (error) {
@@ -1947,7 +1974,7 @@ This will help me send you personalized movie recommendations! 🍿`;
     }
     
     // Show general releases as well
-    const generalReleases = await fetchNewReleases('movie');
+  const generalReleases = await fetchNewReleases('movie');
     
     if (generalReleases.length > 0) {
       await ctx.reply(`🌍 General Releases Today:`);
