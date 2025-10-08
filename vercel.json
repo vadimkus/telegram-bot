@@ -2,20 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/test.js",
+      "src": "api/simple-bot.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/test.js"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "0 0 * * *"
+      "dest": "/api/simple-bot.js"
     }
   ]
 }
